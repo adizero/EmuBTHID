@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 
+import subprocess
 import sys
 import os
 import time
@@ -9,10 +10,31 @@ import keymap
 from Xlib import X, display, Xutil
 from dbus.mainloop.glib import DBusGMainLoop
 
+# Bluetoothd 'input' plugin needs to be disabled in bluetooth.service configuration:
+# vim /usr/lib/systemd/system/bluetooth.service
+# [Service]
+# ExecStart=/usr/lib/bluetooth/bluetoothd --noplugin=input
+#
+# Possible to temporarily run bluetoothd manually with disabled 'input' plugin:
+# systemctl mask bluetooth
+# systemctl stop bluetooth
+# sudo /usr/lib/bluetooth/bluetoothd -P input
+# systemctl unmask bluetooth
+# systemctl start bluetooth
+
 """
 Change this CONTROLLER_MAC to the mac of your own device
 """
-CONTROLLER_MAC = "5C:87:9C:96:BE:5E"
+# autodetection of controller mac address
+btctl_output=subprocess.Popen(['bluetoothctl', 'mgmt.info'], stdout=subprocess.PIPE)
+grep_output=subprocess.Popen(['grep', 'addr'], stdin=btctl_output.stdout, stdout=subprocess.PIPE)
+awk_output=subprocess.run(['awk', '{print $2}'], stdin=grep_output.stdout, stdout=subprocess.PIPE)
+btctl_output.stdout.close()
+CONTROLLER_MAC = awk_output.stdout.decode().strip()
+if not CONTROLLER_MAC:
+    # if autodetection does not work then set manually based on 'bluetoothctl show' 
+    CONTROLLER_MAC = "E0:2A:82:30:A1:C5"
+print(f'Found controller {CONTROLLER_MAC}')
 
 usbhid_map = {}
 with open("keycode.txt") as f:
